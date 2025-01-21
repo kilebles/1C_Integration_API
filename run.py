@@ -1,5 +1,5 @@
-from app.main import app
-from app.config import Config
+from app.core.main import app
+from app.core.config import Config
 import uvicorn
 
 if __name__ == "__main__":

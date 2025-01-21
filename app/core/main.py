@@ -6,7 +6,7 @@ from fastapi.openapi.utils import get_openapi
 
 from app.utils.logger import setup_logging
 from app.endpoints import invoices, tasks
-from app.config import Config
+from app.core.config import Config
 
 logger = logging.getLogger(__name__)
 setup_logging(log_level=Config.LOG_LEVEL, log_file="app.log")
