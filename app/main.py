@@ -1,10 +1,15 @@
+import logging
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.security import APIKeyHeader
 from starlette.status import HTTP_401_UNAUTHORIZED
 from fastapi.openapi.utils import get_openapi
 
-from app.endpoints import invoices, references
+from app.utils.logger import setup_logging
+from app.endpoints import invoices, tasks
 from app.config import Config
+
+logger = logging.getLogger(__name__)
+setup_logging(log_level=Config.LOG_LEVEL, log_file="app.log")
 
 api_key_header = APIKeyHeader(name="Authorization", auto_error=False)
 
@@ -21,11 +26,11 @@ app = FastAPI(
 )
 
 app.include_router(invoices.router)
-app.include_router(references.router)
+app.include_router(tasks.router)
 
 @app.on_event("startup")
 async def print_ngrok_url():
-    print(f"Server is accessible at: {Config.PUBLIC_URL}") # Для отладки
+    logger.info(f"Сервер запущен с: {Config.PUBLIC_URL}") # Для отладки
 
 def custom_openapi():
     if app.openapi_schema:
