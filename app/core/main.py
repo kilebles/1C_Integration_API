@@ -3,6 +3,7 @@ from fastapi import FastAPI, Depends, HTTPException
 from fastapi.security import APIKeyHeader
 from starlette.status import HTTP_401_UNAUTHORIZED
 from fastapi.openapi.utils import get_openapi
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.utils.logger import setup_logging
 from app.endpoints import invoices, tasks
@@ -27,6 +28,14 @@ app = FastAPI(
 
 app.include_router(invoices.router)
 app.include_router(tasks.router)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Можно указать список разрешённых доменов, вместо "*"
+    allow_credentials=True,
+    allow_methods=["*"],  # Разрешить все методы (GET, POST, PUT, DELETE и т.д.)
+    allow_headers=["*"],  # Разрешить все заголовки
+)
+
 
 @app.on_event("startup")
 async def print_ngrok_url():

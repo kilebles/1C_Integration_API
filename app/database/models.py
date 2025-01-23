@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime
+from sqlalchemy import Column, Integer, String, Float, DateTime, Text
 from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime, timezone
 
@@ -15,3 +15,12 @@ class Task(Base):
   quantity = Column(Float, nullable=False)
   price = Column(Float, nullable=False)
   created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+  
+class ErrorTask(Base):
+  __tablename__ = "error_tasks"
+  
+  id = Column(Integer, primary_key=True, autoincrement=True)
+  task_id = Column(Integer, nullable=False)
+  error_reason = Column(Text, nullable=False)
+  created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    

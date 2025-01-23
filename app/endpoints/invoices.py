@@ -42,7 +42,7 @@ async def get_task(
         "тип_документа": task.document_type,
         "бин_контрагента": task.counterparty_bin,
         "наименование": task.name,
-        "количесвто": task.quantity,
+        "количество": task.quantity,
         "цена": task.price,
         "создано": task.created_at.strftime("%Y-%m-%d %H:%M:%S"),
     }
