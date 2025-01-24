@@ -16,7 +16,12 @@ def get_db():
     finally:
         db.close()
         
-@router.get("/tasks/{task_id}")
+@router.get(
+    "/tasks/{task_id}",
+    tags=["Задания"],
+    summary="Получить задание по ID 1С",
+    description="Этот эндпоинт позволяет получить данные о задании"
+    )
 async def get_task(
     task_id: int,
     authorization: str = Header(None),
@@ -46,4 +51,3 @@ async def get_task(
         "цена": task.price,
         "создано": task.created_at.strftime("%Y-%m-%d %H:%M:%S"),
     }
-

@@ -1,6 +1,6 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from app.database.models import Base, Task, ErrorTask
+from app.database.models import Base, Task, ErrorTask, Shipment, ShipmentProduct
 from app.core.config import Config
 
 engine = create_engine(Config.DATABASE_URL)
@@ -51,3 +51,27 @@ def restore_task_from_error(session, task_id, user_bin, document_type, counterpa
   session.delete(error_task)
   session.commit()
   return restored_task
+
+
+def create_shipment_in_db(session, shipment_data):
+  new_shipment = Shipment(
+    user_bin=shipment_data["user_bin"],
+    contragent_bin=shipment_data["contragent_bin"],
+    dct_type=shipment_data["dct_type"],
+  )
+  session.add(new_shipment)
+  session.commit()
+  session.refresh(new_shipment)
+  return new_shipment
+
+
+def add_products_to_shipment(session, shipment_id, products):
+    for product in products:
+        new_product = ShipmentProduct(
+            shipment_id=shipment_id,
+            tovar_name=product.tovar_name,
+            tovar_count=product.tovar_count,
+            tovar_price=product.tovar_price,
+        )
+        session.add(new_product)
+    session.commit()

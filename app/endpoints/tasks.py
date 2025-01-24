@@ -1,5 +1,5 @@
 import logging
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from fastapi import APIRouter, HTTPException, Header, Depends
 from sqlalchemy.orm import Session
 from app.core.config import Config
@@ -9,6 +9,89 @@ from app.database.requests import SessionLocal, create_task_in_db, move_task_to_
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+class TaskRequest(BaseModel):
+    document_type: str = Field(
+        ...,
+        example="Cчет",
+        description="Тип документа (например, счет)"
+    )
+    bin: str = Field(
+        ...,
+        example="123456789012",
+        description="БИН контрагента"
+    )
+    name: str = Field(
+        ...,
+        example="Тестовое задание",
+        description="Название задания"
+    )
+    quantity: float = Field(
+        ...,
+        example=10.5,
+        description="Кол-во товара или услуг"
+    )
+    price: float = Field(
+        ..., 
+        example=1500.0, 
+        description="Цена за единицу товара или услуги"
+    )
+
+
+class RetryTaskRequest(BaseModel):
+    ид_задачи: int = Field(
+        ..., 
+        example=1, 
+        description="Идентификатор задания для восстановления"
+    )
+    бин_пользователя: str = Field(
+        ..., 
+        example="987654321098", 
+        description="БИН пользователя"
+    )
+    тип_документа: str = Field(
+        ..., 
+        example="Cчет", 
+        description="Тип документа (например, счет)"
+    )
+    бин_контрагента: str = Field(
+        ..., 
+        example="123456789012", 
+        description="БИН контрагента"
+    )
+    название: str = Field(
+        ..., 
+        example="Исправленное задание", 
+        description="Название задания"
+    )
+    количество: float = Field(
+        ..., 
+        example=5.0, 
+        description="Количество товара или услуг"
+    )
+    цена: float = Field(
+        ..., 
+        example=1000.0, 
+        description="Цена за единицу товара или услуги"
+    )
+
+class TaskResultRequest(BaseModel):
+    ид_задачи: int = Field(
+        ..., 
+        example=1, 
+        description="Идентификатор задания"
+    )
+    статус: str = Field(
+        ..., 
+        example="успех", 
+        description="Статус выполнения задания ('успех' или 'ошибка')"
+    )
+    причина_ошибки: str = Field(
+        default="", 
+        example="Контрагент не найден", 
+        description="Причина ошибки (обязательно, если статус = 'ошибка')"
+    )
+    
+    
 def get_db():
     db = SessionLocal()
     try:
@@ -16,124 +99,116 @@ def get_db():
     finally:
         db.close()
 
-@router.post("/tasks")
+
+@router.post(
+    "/tasks",
+    tags=["Задания"],
+    summary="Создание нового задания",
+    description="""
+        Этот эндпоинт позволяет создать новое задание
+        """
+    )
 async def create_task(
-    data: dict, 
+    data: TaskRequest,
     authorization: str = Header(None),
     user_bin: str = Header(None),
     db: Session = Depends(get_db)
 ):
     logger.info(f"Получен запрос на создание задания: {data}, User-Bin: {user_bin}")
-    
+
     expected_token = f"Bearer {Config.API_KEY}"
-    
     if authorization != expected_token:
-        logger.error("Не указан User-Bin в заголовке")
+        logger.error("Ошибка авторизации")
         raise HTTPException(status_code=401, detail="Не авторизован")
     
     if not user_bin:
         raise HTTPException(status_code=400, detail="Не указан БИН пользователя")
     
-    task_data = {
-        "user_bin": user_bin,
-        "document_type": data.get("document_type"),
-        "counterparty_bin": data.get("bin"),
-        "name": data.get("name"),
-        "quantity": data.get("quantity"),
-        "price": data.get("price"),
-    }
-    
+
+    task_data = data.model_dump()
+    task_data["user_bin"] = user_bin
+    task_data["counterparty_bin"] = task_data.pop("bin")  # Переименовываем поле
+
     try:
         task = create_task_in_db(db, task_data)
-    except Exception  as e:
-        logger.error("Ошибка при сохранении задания: {e}")
+    except Exception as e:
+        logger.error(f"Ошибка при сохранении задания: {e}")
         raise HTTPException(status_code=500, detail="Ошибка при сохранении задания")
-        
+    
     logger.info(f"Задание успешно обработано для пользователя с БИН {user_bin}")
-
-    return {
-        "message": "Задание успешно создано",
-        "task_id": task.id,
-        "created_at": task.created_at
-    }
+    return {"task_id": task.id}
 
 
-@router.post("/tasks/result")
+@router.post(
+    "/tasks/result",
+    tags=["Задания"],
+    summary="Результат задания из 1С",
+    description="""
+        Этот эндпоинт позволяет отправить задание в 'Ошибочные', если статус: 'ошибка',
+        или удалить задание, если статус: 'успех'
+        """
+    )
 async def process_task_result(
-    data: dict,
+    data: TaskResultRequest,
     authorization: str = Header(None),
     db: Session = Depends(get_db)
 ):
     logger.info(f"Получен результат выполнения задачи: {data}")
-    
-    excepted_token = f"Bearer {Config.API_KEY}"
-    
-    if authorization != excepted_token:
+
+    expected_token = f"Bearer {Config.API_KEY}"
+    if authorization != expected_token:
         logger.error("Ошибка авторизации")
         raise HTTPException(status_code=401, detail="Не авторизован")
-    
-    field_mapping = {
-        "ид_задачи": "task_id",
-        "статус": "status",
-        "причина_ошибки": "error_reason"
-    }
-    mapped_data = {field_mapping.get(k, k): v for k, v in data.items()}
-    
+
     status_mapping = {
         "успех": True,
         "ошибка": False
     }
-    
-    task_id = mapped_data.get("task_id")
-    status = status_mapping.get(mapped_data.get("status")) 
-    error_reason = mapped_data.get("error_reason", "")
-    
+
+    task_id = data.ид_задачи
+    status = status_mapping.get(data.статус)
+    error_reason = data.причина_ошибки or ""
+
     if status is None:
         logger.error("Некорректное значение для статуса")
         raise HTTPException(status_code=400, detail="Некорректное значение для статуса")
-    
+
     if status and error_reason:
         logger.warning("Причина ошибки указана, но статус задачи 'успех'")
         error_reason = ""
-        
-    if status and not error_reason:
+
+    if not status and not error_reason:
         error_reason = "Нет ошибок"
-    
-    if task_id is None or status is None:
-        logger.error("Некорректные данные в запросе: отсутствует идентификатор или статус")
-        raise HTTPException(status_code=400, detail="Некорректные данные: 'ид_задачи' и 'статус' обязательны")
-    
+
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
         logger.error(f"Задача с ID {task_id} не найдена")
         raise HTTPException(status_code=404, detail=f"Задача с ID {task_id} не найдена")
-    
-    if status:  
+
+    if status:
         db.delete(task)
         db.commit()
         logger.info(f"Задача с ID {task_id} успешно завершена и удалена")
         return {"message": f"Задача с ID {task_id} успешно завершена"}
-    
 
     try:
         move_task_to_error(db, task_id, error_reason)
         logger.info(f"Задача с ID {task_id} перемещена в таблицу ошибок")
         return {"message": f"Задача с ID {task_id} перемещена в таблицу ошибок"}
     except Exception as e:
-        logger.error(f"Ошибка при перемещении задачи в таблицу ошибок: {e}")
+        logger.error(f"Ошибка при перемещении задачи в таблицу ошибок: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Ошибка при обработке задачи")
 
 
-class RetryTaskRequest(BaseModel):
-    ид_задачи: int
-    бин_пользователя: str
-    тип_документа: str
-    бин_контрагента: str
-    название: str
-    количество: float
-    цена: float
-    
-@router.post("/tasks/retry")
+
+@router.post(
+    "/tasks/retry",
+    tags=["Задания"],
+    summary="Восстановление задания 1С",
+    description="""
+        Этот эндпоинт позволяет восстановить задание из 'Ошибочных'
+        """
+    )
 async def retry_task(
     data: RetryTaskRequest,
     authorization: str = Header(None),
@@ -146,7 +221,7 @@ async def retry_task(
         logger.error("Ошибка авторизации")
         raise HTTPException(status_code=401, detail="Не авторизован")
     
-    mapped_data = data.dict()
+    mapped_data = data.model_dump()
 
     task_id = mapped_data.get("ид_задачи")
     
@@ -173,3 +248,5 @@ async def retry_task(
     except Exception as e:
         logger.error(f"Ошибка при восстановлении задачи: {e}")
         raise HTTPException(status_code=500, detail="Ошибка при восстановлении задачи")
+
+

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, Text
+from sqlalchemy import Column, ForeignKey, Integer, String, Float, DateTime, Text
 from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime, timezone
 
@@ -24,3 +24,20 @@ class ErrorTask(Base):
   error_reason = Column(Text, nullable=False)
   created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     
+class Shipment(Base):
+  __tablename__ = "shipments"
+  
+  id = Column(Integer, primary_key=True, autoincrement=True)
+  user_bin = Column(String(12), nullable=False)
+  contragent_bin = Column(String(50), nullable=False)
+  dct_type = Column(String(50), nullable=False)
+  created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+  
+class ShipmentProduct(Base):
+  __tablename__ = "shipment_products"
+  
+  id = Column(Integer, primary_key=True, autoincrement=True)
+  shipment_id = Column(Integer, ForeignKey("shipments.id"), nullable=False)
+  tovar_name = Column(String(100), nullable=False)
+  tovar_count = Column(Integer, nullable=False)
+  tovar_price = Column(Float, nullable=False)

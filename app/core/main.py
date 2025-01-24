@@ -6,7 +6,7 @@ from fastapi.openapi.utils import get_openapi
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.utils.logger import setup_logging
-from app.endpoints import invoices, tasks
+from app.endpoints import invoices, tasks, shipments
 from app.core.config import Config
 
 logger = logging.getLogger(__name__)
@@ -22,24 +22,25 @@ def get_api_key(api_key: str = Depends(api_key_header)):
 
 app = FastAPI(
     title="1C API",
-    description="API",
-    version="1.0.0",
+    description="REST API",
+    version="1.3.0",
 )
 
 app.include_router(invoices.router)
 app.include_router(tasks.router)
+app.include_router(shipments.router)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Можно указать список разрешённых доменов, вместо "*"
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  # Разрешить все методы (GET, POST, PUT, DELETE и т.д.)
-    allow_headers=["*"],  # Разрешить все заголовки
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
 @app.on_event("startup")
 async def print_ngrok_url():
-    logger.info(f"Сервер запущен с: {Config.PUBLIC_URL}") # Для отладки
+    logger.info(f"Сервер запущен с: {Config.PUBLIC_URL}")
 
 def custom_openapi():
     if app.openapi_schema:
