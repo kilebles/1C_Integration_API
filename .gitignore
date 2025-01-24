@@ -5,6 +5,7 @@ __pychache__/
 .env
 .idea/
 .vscode/
+.ini
 
 .DS_Store
 Thumbs.db
